@@ -92,9 +92,16 @@ vita_create_self(lau-shell-probe.suprx lau_shell_probe UNSAFE
 )
 
 add_executable(vita_homebrew_update service-plugin/main.c)
+target_compile_options(vita_homebrew_update PRIVATE
+    -ffreestanding
+    -fno-stack-protector
+)
+target_link_options(vita_homebrew_update PRIVATE -Wl,-q -nostdlib)
 target_link_libraries(vita_homebrew_update
-    SceKernelThreadMgr_stub
-    SceNet_stub
+    taihen_stub_weak
+    SceIofilemgr_stub_weak
+    SceKernelThreadMgr_stub_weak
+    SceLibKernel_stub_weak
 )
 vita_create_self(vita-homebrew-update.suprx vita_homebrew_update UNSAFE
     CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/service-plugin/exports.yml

@@ -19,6 +19,10 @@ Applications must use their own updater until the LiveArea hook and complete
 download/install path pass their firmware gates. It does not falsely advertise
 status `2` yet.
 
+The status-service path has passed its first retail hardware gate. See
+`docs/hardware/2026-09-23-status-service.md` for the artifact identity and
+device log.
+
 ## Client integration
 
 Initialize SceNet, link `libHomebrewUpdateClient.a`, and call:
