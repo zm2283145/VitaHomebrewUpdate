@@ -80,6 +80,17 @@ Remove the config entry if the shell becomes unstable. The current service has
 no code patch and binds only to loopback, but `*main` plugins should always be
 tested cautiously.
 
+With Vita Companion FTP active, the backup-aware installer can perform the
+copy and config update:
+
+```text
+python host/install_plugin.py build/vita-homebrew-update.suprx --vita VITA_IP
+```
+
+It preserves a timestamped copy of `ur0:tai/config.txt`, backs up an older
+plugin when present, uses staged uploads, and verifies both final files by
+readback. Reboot the Vita after it succeeds.
+
 ## Update feed
 
 The test VPK embeds:
