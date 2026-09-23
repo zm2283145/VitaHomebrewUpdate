@@ -1,0 +1,8 @@
+/build*/
+/serve/
+.tools/
+test-feed/*.vpk
+test-feed/payload.pkg
+/notification-plugin/
+__pycache__/
+*.pyc

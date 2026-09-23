@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<titlepatch status="alive" titleid="LAUTEST01">
+  <tag name="LAUTEST01_T0" signoff="true">
+    <package version="01.01" size="99556"
+        sha1sum="24bbadf2727a9f34775dd77550707a934c450034" url="https://github.com/zm2283145/VitaHomebrewUpdate/releases/download/test-v0.1.0/LAUTEST01-01.01-VitaHomebrewUpdateTest.vpk"
+        psp2_system_ver="56623104" content_id="EP9000-LAUTEST01_00-VITAHBUUPDATE001">
+      <paramsfo><title>VitaHomebrewUpdate Test</title></paramsfo>
+      <changeinfo url="https://github.com/zm2283145/VitaHomebrewUpdate/releases/download/test-v0.1.0/LAUTEST01-changeinfo.xml"/>
+    </package>
+  </tag>
+</titlepatch>

@@ -1,0 +1,3 @@
+title_id=@LAU_TEST_TITLE_ID@
+name=VitaHomebrewUpdate Test
+update_url=@LAU_UPDATE_XML_URL@
