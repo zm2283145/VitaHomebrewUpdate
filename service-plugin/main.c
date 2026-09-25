@@ -15,6 +15,7 @@
 
 #include "bgdl.h"
 #include "bearssl_support.h"
+#include "changeinfo.h"
 #include "file_verify.h"
 #include "fs_tree.h"
 #include "pending_update.h"
@@ -2314,7 +2315,10 @@ static void test_update_dialog_main_thread(void *data)
         "Do you want to launch this application now?";
     static const char wait_message_text[] = "Please wait...";
     static const char installing_message_text[] = "Installing...";
+    static const char changeinfo_fallback_text[] =
+        "Release notes are unavailable for this update.";
     char download_message_text[512];
+    char changeinfo_text[288];
     const char *selected_title;
     const char *selected_message;
     int busy;
@@ -2339,19 +2343,21 @@ static void test_update_dialog_main_thread(void *data)
         test_update_dialog_active = 3;
         return;
     }
+    (void)vhbu_changeinfo_extract_or_fallback(
+        changeinfo_xml, changeinfo_xml_size, changeinfo_text,
+        sizeof(changeinfo_text), changeinfo_fallback_text);
     (void)sceClibSnprintf(
         download_message_text, sizeof(download_message_text),
         "A new version of the application is available\n\n"
         "Installed Version: %s\n"
         "Available Version: %s (%u.%02u KB)\n\n"
-        "- Completes native verification and staged installation\n"
-        "- Adds restart recovery and notification install actions\n"
-        "- Preserves Shell responsiveness on every exit path\n\n"
+        "What's new:\n%s\n\n"
         "Do you want to download now?",
         ACTIVE_INSTALLED_VERSION, ACTIVE_UPDATE_VERSION,
         (unsigned int)(ACTIVE_PACKAGE_SIZE / 1024u),
         (unsigned int)((ACTIVE_PACKAGE_SIZE % 1024u) *
-                       100u / 1024u));
+                       100u / 1024u),
+        changeinfo_text);
     busy = test_update_dialog_kind == 3 || test_update_dialog_kind == 5;
     selected_title = test_update_dialog_kind == 5 ?
         installing_title_text : title_text;

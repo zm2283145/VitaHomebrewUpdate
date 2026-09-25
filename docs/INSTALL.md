@@ -7,7 +7,7 @@
 > VitaHomebrewUpdate, comment out or remove
 > `ux0:data/vitadb/vdb_daemon.suprx` from the `*main` section and reboot.
 
-VitaHomebrewUpdate v1.0.0 is hardware-proven only on retail firmware 3.65.
+VitaHomebrewUpdate v1.0.1 is hardware-proven only on retail firmware 3.65.
 Its SceShell hooks are firmware-signature-gated and it is not a general
 firmware compatibility claim.
 

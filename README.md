@@ -29,7 +29,7 @@ does not claim exact internal equivalence. The reference project is credited
 with demonstrating that this user experience was possible.
 
 **Supported firmware:** retail 3.65 is the only hardware-proven scope for
-v1.0.0. Private SceShell offsets and signatures are firmware-specific; do not
+v1.0.1. Private SceShell offsets and signatures are firmware-specific; do not
 interpret the runtime guards as evidence of compatibility with other firmware.
 
 ## Installation
@@ -200,18 +200,18 @@ build-release/libHomebrewUpdateClient.a
 Create the release bundle from a clean build:
 
 ```text
-python host/package_release.py --build-dir build-release --output dist/v1.0.0
+python host/package_release.py --build-dir build-release --output dist/v1.0.1
 ```
 
 ## Provenance and limitations
 
-v1.0.0 is based on restored hardware-proven candidate 124 (SHA-256
+v1.0.1 retains the restored hardware-proven candidate 124 basis (SHA-256
 `e2e650af272554b0649da209d51e09e7766aef21491f346bfbd3542d3f598202`,
 168,053 bytes). Candidate 125 and its failed low-memory experiment are not
 published. Production cleanup removes LAUTEST fallback configuration and
 research-only targets, so a clean production build is validated by source,
 configuration, and behavior rather than being represented as byte-identical.
 
-See [docs/RELEASE_NOTES_v1.0.0.md](docs/RELEASE_NOTES_v1.0.0.md) for the
+See [docs/RELEASE_NOTES_v1.0.1.md](docs/RELEASE_NOTES_v1.0.1.md) for the
 release-specific validation statement and known limitations, and
 [THIRD_PARTY.md](THIRD_PARTY.md) for license attribution.

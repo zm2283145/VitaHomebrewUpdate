@@ -10,7 +10,7 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     endif()
 endif()
 
-project(VitaHomebrewUpdate VERSION 1.0.0 LANGUAGES C ASM)
+project(VitaHomebrewUpdate VERSION 1.0.1 LANGUAGES C ASM)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_OBJECT_PATH_MAX 128)
@@ -108,6 +108,7 @@ target_compile_options(vhbu_bearssl PRIVATE -O2)
 
 add_executable(vita_homebrew_update
     service-plugin/main.c
+    common/changeinfo.c
     common/bearssl_support.c
     common/libc_compat.c
     common/file_verify.c

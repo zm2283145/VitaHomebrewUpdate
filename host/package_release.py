@@ -35,7 +35,7 @@ def git_output(root: Path, *arguments: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--build-dir", type=Path, default=Path("build-release"))
-    parser.add_argument("--output", type=Path, default=Path("dist/v1.0.0"))
+    parser.add_argument("--output", type=Path, default=Path("dist/v1.0.1"))
     parser.add_argument("--source-ref", default="HEAD")
     args = parser.parse_args()
 
@@ -78,7 +78,7 @@ def main() -> int:
     shutil.copy2(root / "README.md", output / "README.md")
     shutil.copy2(root / "docs/INSTALL.md", output / "INSTALL.md")
 
-    sdk = output / "vita-homebrew-update-client-v1.0.0.zip"
+    sdk = output / "vita-homebrew-update-client-v1.0.1.zip"
     with zipfile.ZipFile(sdk, "w") as archive:
         add_file(archive, root / "client/include/homebrew_update_client.h",
                  "include/homebrew_update_client.h")
@@ -88,7 +88,7 @@ def main() -> int:
                  "src/pending_update.h")
         add_file(archive, library, "lib/libHomebrewUpdateClient.a")
 
-    source = output / "vita-homebrew-update-v1.0.0-source.zip"
+    source = output / "vita-homebrew-update-v1.0.1-source.zip"
     subprocess.run(
         ["git", "archive", "--format=zip", f"--output={source}",
          source_revision],
@@ -97,7 +97,7 @@ def main() -> int:
     )
 
     (output / "BUILD_PROVENANCE.txt").write_text(
-        "VitaHomebrewUpdate v1.0.0\n"
+        "VitaHomebrewUpdate v1.0.1\n"
         f"source_commit={source_revision}\n"
         "build_state=clean\n"
         "candidate_124_sha256="
