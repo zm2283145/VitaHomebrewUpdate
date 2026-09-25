@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Copy a test artifact into the PC server root and create its manifest."""
+"""Create a VitaHomebrewUpdate release manifest and matching assets."""
 
 from __future__ import annotations
 
@@ -15,20 +15,16 @@ from urllib.parse import quote
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("artifact", type=Path)
-    parser.add_argument("--root", type=Path, default=Path("serve"))
-    parser.add_argument("--title-id", default="LAUTEST01")
-    parser.add_argument("--version", default="01.01")
+    parser.add_argument("--root", type=Path, default=Path("release-feed"))
+    parser.add_argument("--title-id", required=True)
+    parser.add_argument("--version", required=True)
     location = parser.add_mutually_exclusive_group(required=True)
     location.add_argument("--host", help="PC address reachable by the Vita")
     location.add_argument("--base-url", help="Public directory or release URL")
     parser.add_argument("--port", type=int, default=8080)
-    parser.add_argument("--name", default="VitaHomebrewUpdate Test")
-    parser.add_argument(
-        "--content-id", default="EP9000-LAUTEST01_00-VITAHBUUPDATE001"
-    )
-    parser.add_argument(
-        "--changes", default="Test update delivered by VitaHomebrewUpdate."
-    )
+    parser.add_argument("--name", required=True)
+    parser.add_argument("--content-id", required=True)
+    parser.add_argument("--changes", required=True)
     args = parser.parse_args()
 
     artifact = args.artifact.resolve()
@@ -84,15 +80,8 @@ def main() -> int:
 '''
     (args.root / xml_name).write_text(update_xml, encoding="utf-8")
     (args.root / changes_name).write_text(changes_xml, encoding="utf-8")
-    marker = b"LiveArea Update native background download probe\n"
-    payload_size = 2 * 1024 * 1024
-    (args.root / "payload.pkg").write_bytes(
-        (marker * ((payload_size + len(marker) - 1) // len(marker)))[:payload_size]
-    )
     print(json.dumps(manifest, indent=2, sort_keys=True))
     print(f"Update XML: {base_url}/{xml_name}")
-    if args.host:
-        print(f"Probe URL: {base_url}/payload.pkg")
     return 0
 
 

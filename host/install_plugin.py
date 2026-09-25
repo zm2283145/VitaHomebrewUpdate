@@ -16,6 +16,7 @@ REMOTE_DIRECTORY = "/ur0:/tai"
 CONFIG_NAME = "config.txt"
 PLUGIN_NAME = "vita-homebrew-update.suprx"
 CONFIG_ENTRY = f"ur0:tai/{PLUGIN_NAME}"
+INCOMPATIBLE_ENTRY = "ux0:data/vitadb/vdb_daemon.suprx"
 MAX_CONFIG_SIZE = 256 * 1024
 MAX_PLUGIN_SIZE = 2 * 1024 * 1024
 
@@ -66,6 +67,11 @@ def updated_config(original: bytes) -> tuple[bytes, bool]:
         for line in lines
         if line.strip() and not line.lstrip().startswith("#")
     ]
+    if INCOMPATIBLE_ENTRY in active_entries:
+        raise RuntimeError(
+            "VitaDB Downloader's vdb_daemon.suprx is active in taiHEN config; "
+            "disable it and reboot before installing VitaHomebrewUpdate"
+        )
     if CONFIG_ENTRY in active_entries:
         return original, False
 

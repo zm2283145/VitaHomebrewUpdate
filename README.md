@@ -1,135 +1,217 @@
 # VitaHomebrewUpdate
 
-An open PS Vita homebrew update system aimed at making homebrew updates feel
-like official LiveArea updates. Development proceeds in small, hardware-tested
-gates so an unsupported shell hook cannot create a boot loop.
+> [!WARNING]
+> **VitaDB Downloader's `vdb_daemon.suprx` is confirmed incompatible with
+> VitaHomebrewUpdate. Enabling both causes SceShell hard locks, LiveArea
+> background corruption, and FTP/network instability. Comment out or remove
+> `ux0:data/vitadb/vdb_daemon.suprx` from `*main` and reboot before enabling
+> VitaHomebrewUpdate. This project does not claim VitaDB compatibility.**
 
-## Current milestone
+VitaHomebrewUpdate gives configured PS Vita homebrew an official-game-style
+LiveArea update workflow. It discovers per-title configuration, checks a
+stable release manifest, presents the native update experience, downloads
+through BGDL, verifies the package, stages it, and installs it before the
+updated app launches.
 
-The repository currently provides:
+## Reference project acknowledgment
 
-- a source-compatible `HomebrewUpdateClient` library;
-- a loopback status service at `http://127.0.0.1:13379/status`;
-- a disposable `LAUTEST01` app that demonstrates plugin/fallback selection;
-- a GitHub-ready XML feed generator with size, SHA-1, and SHA-256 metadata;
-- a native download probe retained for hardware research.
+VitaHomebrewUpdate is an independent behavioral reimplementation inspired by
+the reference HomebrewUpdate project, which demonstrated this workflow on PS
+Vita. The reference project's source code was not available and was not
+copied or used. This implementation was recreated independently from visual
+and on-device observation of the reference behavior and from publicly visible
+interfaces and artifacts. It was then independently extended with dynamic
+per-title configuration, a title-scoped client readiness API, strict package
+verification, a persistent notification/install lifecycle, and BGDL cleanup.
 
-The service intentionally returns status `1` (hook error) in this milestone.
-Applications must use their own updater until the LiveArea hook and complete
-download/install path pass their firmware gates. It does not falsely advertise
-status `2` yet.
+This project is not affiliated with or endorsed by the reference project and
+does not claim exact internal equivalence. The reference project is credited
+with demonstrating that this user experience was possible.
 
-The status-service path has passed its first retail hardware gate. See
-`docs/hardware/2026-09-23-status-service.md` for the artifact identity and
-device log.
+**Supported firmware:** retail 3.65 is the only hardware-proven scope for
+v1.0.0. Private SceShell offsets and signatures are firmware-specific; do not
+interpret the runtime guards as evidence of compatibility with other firmware.
 
-## Client integration
+## Installation
 
-Initialize SceNet, link `libHomebrewUpdateClient.a`, and call:
+1. Disable VitaDB Downloader's daemon and reboot as required by the warning.
+2. Copy `vita-homebrew-update.suprx` to `ur0:tai/`.
+3. Add `ur0:tai/vita-homebrew-update.suprx` beneath `*main` in
+   `ur0:tai/config.txt`. Keep it after foundational shell/kernel plugins and
+   before the next section header.
+4. Reboot.
 
-```c
-int status = HomebrewUpdateClientGetStatus();
+See [docs/INSTALL.md](docs/INSTALL.md) for backup-aware FTP installation,
+uninstall, and boot-recovery instructions.
+
+## App configuration
+
+Each participating app must ship:
+
+```text
+ux0:app/<TITLE_ID>/sce_sys/homebrew_update.ini
 ```
 
-The return values are compatible with the documented HomebrewUpdate contract:
+The schema is:
 
-| Value | Meaning | Application behavior |
+```ini
+title_id=VITAHBU01
+name=Example Homebrew
+update_url=https://raw.githubusercontent.com/OWNER/REPOSITORY/main/update/VITAHBU01-ver.xml
+```
+
+- `title_id` is required and must be exactly nine uppercase ASCII letters or
+  digits. It must match the app directory and installed `param.sfo`.
+- `update_url` is required and must be an absolute HTTP or HTTPS URL.
+- `name` is optional and defaults to the Title ID.
+
+Use a stable manifest URL that does not change for every app release. A raw
+file on the default branch is suitable; that file may point package and
+changeinfo URLs at immutable tagged GitHub release assets. The sample is at
+[`examples/homebrew_update.ini`](examples/homebrew_update.ini).
+
+## Release manifest and change information
+
+The manifest is Sony-style update XML with one `<package>` element. The
+following package attributes are required and validated:
+
+- `version`
+- decimal `size`
+- 40-character hexadecimal `sha1sum`
+- absolute package `url`
+- `content_id`
+
+It must also contain `<changeinfo url="..."/>`. The changeinfo endpoint must
+return XML containing release text; a failed or empty changeinfo fetch does
+not publish an update. The package is accepted only when its exact size and
+SHA-1 match and its VPK structure, entry CRCs/paths, Title ID, app version,
+and Content ID all validate.
+
+Generate matching package, manifest, changeinfo, and JSON metadata:
+
+```text
+python host/prepare_update.py app.vpk \
+  --root release-feed \
+  --title-id VITAHBU01 \
+  --version 01.23 \
+  --name "Example Homebrew" \
+  --content-id EP9000-VITAHBU01_00-EXAMPLEHOMEBREW1 \
+  --changes "Changes in 01.23" \
+  --base-url https://github.com/OWNER/REPOSITORY/releases/download/v1.23.0
+```
+
+Do not alter the VPK after generating the manifest hashes.
+
+## Client API integration
+
+Link `libHomebrewUpdateClient.a`, include
+`homebrew_update_client.h`, initialize SceNet, and identify the calling title:
+
+```c
+int status = HomebrewUpdateClientGetStatusForTitle("VITAHBU01");
+
+if (status == HOMEBREW_UPDATE_READY) {
+    /* Disable the app's built-in updater for this run. */
+} else {
+    /* Keep the built-in updater: -1, 0, 1, and unknown failures fall back. */
+}
+```
+
+Disable the app's built-in updater **only** when status is exactly
+`HOMEBREW_UPDATE_READY` (`2`). Every other status must fall back:
+
+| Status | Symbol | Required app behavior |
 | ---: | --- | --- |
-| `-1` | Plugin not detected | Use the application's updater |
-| `0` | Plugin disabled | Use the application's updater |
-| `1` | Plugin loaded, hook unavailable | Use the application's updater |
-| `2` | Plugin fully ready | Use the LiveArea update path |
+| `-1` | `HOMEBREW_UPDATE_NOT_DETECTED` | Use the built-in updater |
+| `0` | `HOMEBREW_UPDATE_DISABLED` | Use the built-in updater |
+| `1` | `HOMEBREW_UPDATE_HOOK_ERROR` | Use the built-in updater |
+| `2` | `HOMEBREW_UPDATE_READY` | Defer to VitaHomebrewUpdate |
 
-The client timeout is 250 ms, so a missing plugin does not stall application
-startup.
+The title-scoped call arms behavior only for a discovered title. The
+compatibility `HomebrewUpdateClientGetStatus()` call reports service health
+without identifying a title. The client timeout is 250 ms.
+
+Apps integrating the explicit pending-update handoff may call
+`HomebrewUpdateClientLaunchPendingInstaller(title_id)` before their normal
+startup path. It returns `1` after handoff, `0` when no matching staged update
+exists, and a negative value for invalid state or launch failure.
+
+## Update lifecycle
+
+1. The plugin discovers up to eight configured apps and fetches each manifest.
+2. When a newer version exists, LiveArea offers the update and displays the
+   fetched change information.
+3. The VPK downloads as a native BGDL task with normal progress, pause,
+   resume, and cancellation behavior.
+4. Completion is not installation: the plugin exports the task payload,
+   verifies all required hashes and package identity, stages it, and cleans
+   the title's BGDL task tree.
+5. Only after successful verification does the notification become
+   **Waiting to Install**.
+6. Activating that notification **or starting the target app** installs the
+   verified staged update before normal launch. After installation, the app
+   starts on the newly installed version.
+
+Staged state is title-scoped and persisted across reboot. Invalid or incomplete
+packages are deleted instead of promoted.
+
+## PKGj compatibility evidence
+
+PKGj was hardware-tested concurrently with VitaHomebrewUpdate on retail 3.65.
+Both operated with distinct BGDL task IDs, and VitaHomebrewUpdate cleaned only
+its own title's task. A narrow fallback remains for the firmware path where
+BGDL registration does not immediately return a task ID; this should not be
+generalized to untested download managers or firmware.
+
+PKGj evidence does **not** apply to VitaDB Downloader. Its
+`vdb_daemon.suprx` is confirmed incompatible as described in the warning.
 
 ## Build
 
-Install VitaSDK and configure with its toolchain:
+Requirements:
+
+- VitaSDK with `VITASDK` set
+- CMake 3.16 or newer
+- a Make or Ninja generator available to CMake
+- Python 3.10 or newer for host/release tooling
+
+Configure a clean production build with the validated dialog path explicitly
+enabled:
 
 ```text
-cmake -S . -B build
-cmake --build build
+cmake -S . -B build-release -DVHBU_ENABLE_CUSTOM_DIALOG=ON
+cmake --build build-release --target vita-homebrew-update.suprx-self HomebrewUpdateClient
 ```
 
-Important outputs:
+On the validated Windows toolchain:
 
 ```text
-build/libHomebrewUpdateClient.a
-build/vita-homebrew-update.suprx
-build/lau-test-app-01.00.vpk
+C:\vitasdk-tools\cmake-4.4.3-windows-x86_64\bin\cmake.exe -S . -B build-release -G "Unix Makefiles" -DCMAKE_MAKE_PROGRAM=C:\msys64\usr\bin\make.exe -DVHBU_ENABLE_CUSTOM_DIALOG=ON
+C:\vitasdk-tools\cmake-4.4.3-windows-x86_64\bin\cmake.exe --build build-release --target vita-homebrew-update.suprx-self HomebrewUpdateClient
 ```
 
-Build the test update separately:
+Outputs:
 
 ```text
-cmake -S . -B build-01.01 -DLAU_TEST_APP_VERSION=01.01
-cmake --build build-01.01
+build-release/vita-homebrew-update.suprx
+build-release/libHomebrewUpdateClient.a
 ```
 
-## Status-service hardware test
-
-The plugin is a `*main` user plugin and borrows SceShell's initialized network
-stack. Copy `vita-homebrew-update.suprx` to `ur0:tai/`, add it beneath `*main`
-in `ur0:tai/config.txt`, then reboot. Install and run the 01.00 test app.
-
-Expected result for the current milestone:
+Create the release bundle from a clean build:
 
 ```text
-Update service: 1
-installed, hooks unavailable (use fallback)
+python host/package_release.py --build-dir build-release --output dist/v1.0.0
 ```
 
-Remove the config entry if the shell becomes unstable. The current service has
-no code patch and binds only to loopback, but `*main` plugins should always be
-tested cautiously.
+## Provenance and limitations
 
-With Vita Companion FTP active, the backup-aware installer can perform the
-copy and config update:
+v1.0.0 is based on restored hardware-proven candidate 124 (SHA-256
+`e2e650af272554b0649da209d51e09e7766aef21491f346bfbd3542d3f598202`,
+168,053 bytes). Candidate 125 and its failed low-memory experiment are not
+published. Production cleanup removes LAUTEST fallback configuration and
+research-only targets, so a clean production build is validated by source,
+configuration, and behavior rather than being represented as byte-identical.
 
-```text
-python host/install_plugin.py build/vita-homebrew-update.suprx --vita VITA_IP
-```
-
-It preserves a timestamped copy of `ur0:tai/config.txt`, backs up an older
-plugin when present, uses staged uploads, and verifies both final files by
-readback. Reboot the Vita after it succeeds.
-
-## Update feed
-
-The test VPK embeds:
-
-```text
-https://raw.githubusercontent.com/zm2283145/VitaHomebrewUpdate/main/test-feed/LAUTEST01-ver.xml
-```
-
-Generate a feed and release asset from a final VPK with:
-
-```text
-python host/prepare_update.py build-01.01/lau-test-app-01.01.vpk \
-  --root test-feed --version 01.01 \
-  --base-url https://github.com/OWNER/REPO/releases/download/TAG
-```
-
-The generator creates the update XML, change information, JSON metadata, and a
-release-ready copy of the VPK. Never modify the VPK after generating its hashes.
-
-## Roadmap
-
-1. Validate the localhost service and fallback behavior on retail 3.65.
-2. Parse per-title `sce_sys/homebrew_update.ini` configuration.
-3. Add HTTPS XML lookup, semantic version comparison, and strict metadata
-   validation.
-4. Implement resumable background VPK download and native notification state.
-5. Verify VPK structure, Title ID, version, size, and SHA-1 before promotion.
-6. Add a firmware-allowlisted LiveArea refresh/update hook.
-7. Install a completed update before title launch, with recovery-safe staging.
-
-No signature bypass is planned. Homebrew VPK installation will use the existing
-homebrew PromoterUtil path after strict validation, while official package
-authentication remains untouched.
-
-## License and third-party work
-
-See `THIRD_PARTY.md` for adapted research and attribution. A project license
-will be selected before the first stable release.
+See [docs/RELEASE_NOTES_v1.0.0.md](docs/RELEASE_NOTES_v1.0.0.md) for the
+release-specific validation statement and known limitations, and
+[THIRD_PARTY.md](THIRD_PARTY.md) for license attribution.

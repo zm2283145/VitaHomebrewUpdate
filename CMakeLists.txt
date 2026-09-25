@@ -2,107 +2,158 @@ cmake_minimum_required(VERSION 3.16)
 
 if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     if(DEFINED ENV{VITASDK})
-        set(CMAKE_TOOLCHAIN_FILE "$ENV{VITASDK}/share/vita.toolchain.cmake" CACHE PATH "VitaSDK toolchain")
+        set(CMAKE_TOOLCHAIN_FILE
+            "$ENV{VITASDK}/share/vita.toolchain.cmake"
+            CACHE PATH "VitaSDK toolchain")
     else()
         message(FATAL_ERROR "Set VITASDK before configuring")
     endif()
 endif()
 
-project(LiveAreaUpdatePrototype C)
+project(VitaHomebrewUpdate VERSION 1.0.0 LANGUAGES C ASM)
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_OBJECT_PATH_MAX 128)
 include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
 
-set(CMAKE_C_STANDARD 99)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror -O2")
+find_package(Git QUIET)
+set(VHBU_GIT_REVISION "unknown")
+set(VHBU_GIT_STATE "unknown")
+if(GIT_FOUND)
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE VHBU_GIT_REVISION
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE VHBU_GIT_REVISION_RESULT
+    )
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" status --porcelain
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE VHBU_GIT_STATUS
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE VHBU_GIT_STATUS_RESULT
+    )
+    if(VHBU_GIT_REVISION_RESULT EQUAL 0 AND
+       VHBU_GIT_STATUS_RESULT EQUAL 0)
+        if(VHBU_GIT_STATUS STREQUAL "")
+            set(VHBU_GIT_STATE "clean")
+        else()
+            set(VHBU_GIT_STATE "dirty")
+        endif()
+    endif()
+endif()
+file(WRITE "${CMAKE_BINARY_DIR}/vhbu-build-revision.txt"
+    "${VHBU_GIT_REVISION}\n${VHBU_GIT_STATE}\n")
 
-set(LAU_TEST_TITLE_ID "LAUTEST01" CACHE STRING "Title ID for the disposable update target")
-set(LAU_TEST_APP_VERSION "01.00" CACHE STRING "Displayed and packaged test-app version")
-set(LAU_DEFAULT_URL "http://192.168.1.2:8080/payload.pkg" CACHE STRING
-    "Default URL used when ux0:data/LAUpdate/url.txt is absent")
-set(LAU_UPDATE_XML_URL
-    "https://raw.githubusercontent.com/zm2283145/VitaHomebrewUpdate/main/test-feed/LAUTEST01-ver.xml"
-    CACHE STRING "Update XML embedded in the disposable test application")
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/test-app/sce_sys/homebrew_update.ini.in
-    ${CMAKE_CURRENT_BINARY_DIR}/test-app/sce_sys/homebrew_update.ini
-    @ONLY
-)
+option(VHBU_ENABLE_CUSTOM_DIALOG
+    "Enable the hardware-validated LiveArea update confirmation path"
+    ON)
 
 add_library(HomebrewUpdateClient STATIC
     client/src/homebrew_update_client.c
 )
-target_include_directories(HomebrewUpdateClient PUBLIC client/include)
-target_link_libraries(HomebrewUpdateClient PUBLIC SceNet_stub)
-
-add_library(lau_bgdl STATIC common/bgdl.c)
-target_include_directories(lau_bgdl PUBLIC common)
-target_link_libraries(lau_bgdl PUBLIC taihen_stub SceKernelModulemgr_stub)
-
-add_executable(lau_queue_probe
-    queue-probe/main.c
-    "$ENV{VITASDK}/share/gcc-arm-vita-eabi/samples/common/debugScreen.c"
+target_include_directories(HomebrewUpdateClient
+    PUBLIC client/include
+    PRIVATE common
 )
-target_compile_definitions(lau_queue_probe PRIVATE LAU_DEFAULT_URL="${LAU_DEFAULT_URL}")
-target_include_directories(lau_queue_probe PRIVATE
-    "$ENV{VITASDK}/share/gcc-arm-vita-eabi/samples/common"
+target_compile_options(HomebrewUpdateClient PRIVATE
+    -Wall
+    -Wextra
+    -Werror
+    -O2
 )
-target_link_libraries(lau_queue_probe
-    lau_bgdl
-    SceCtrl_stub
-    SceDisplay_stub
+target_link_libraries(HomebrewUpdateClient PUBLIC
+    SceAppMgr_stub
     SceIofilemgr_stub
-)
-vita_create_self(lau-queue-probe-eboot.bin lau_queue_probe UNSAFE)
-vita_create_vpk(lau-queue-probe.vpk LAUQUEUE1 lau-queue-probe-eboot.bin
-    VERSION 01.00
-    NAME "LiveArea Update Queue Probe"
-    FILE ${CMAKE_CURRENT_SOURCE_DIR}/../deploy/agent/assets/sce_sys/icon0.png sce_sys/icon0.png
-)
-
-add_executable(lau_test_app
-    test-app/main.c
-    "$ENV{VITASDK}/share/gcc-arm-vita-eabi/samples/common/debugScreen.c"
-)
-target_compile_definitions(lau_test_app PRIVATE LAU_TEST_APP_VERSION="${LAU_TEST_APP_VERSION}")
-target_include_directories(lau_test_app PRIVATE
-    client/include
-    "$ENV{VITASDK}/share/gcc-arm-vita-eabi/samples/common"
-)
-target_link_libraries(lau_test_app
-    HomebrewUpdateClient
-    SceCtrl_stub
-    SceDisplay_stub
     SceNet_stub
-    SceSysmodule_stub
 )
-vita_create_self(lau-test-app-eboot.bin lau_test_app)
-set(VITA_MKSFOEX_FLAGS
-    "${VITA_MKSFOEX_FLAGS} -d ATTRIBUTE=0x8000 -d ATTRIBUTE2=0 -d ATTRIBUTE_MINOR=0x10 -s CATEGORY=gd -s CONTENT_ID=EP9000-${LAU_TEST_TITLE_ID}_00-VITAHBUUPDATE001 -d LAREA_TYPE=0 -d PARENTAL_LEVEL=1 -s PSP2_DISP_VER=03.600 -d PSP2_SYSTEM_VER=56623104"
-)
-vita_create_vpk(lau-test-app-${LAU_TEST_APP_VERSION}.vpk ${LAU_TEST_TITLE_ID} lau-test-app-eboot.bin
-    VERSION ${LAU_TEST_APP_VERSION}
-    NAME "LiveArea Update Test ${LAU_TEST_APP_VERSION}"
-    FILE
-        ${CMAKE_CURRENT_BINARY_DIR}/test-app/sce_sys/homebrew_update.ini sce_sys/homebrew_update.ini
+set_target_properties(HomebrewUpdateClient PROPERTIES
+    OUTPUT_NAME HomebrewUpdateClient
 )
 
-add_executable(lau_shell_probe shell-plugin/main.c)
-target_link_libraries(lau_shell_probe taihen_stub SceIofilemgr_stub)
-vita_create_self(lau-shell-probe.suprx lau_shell_probe UNSAFE
-    CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/shell-plugin/exports.yml
+add_library(vhbu_bgdl STATIC common/bgdl.c)
+target_include_directories(vhbu_bgdl PUBLIC common)
+target_compile_options(vhbu_bgdl PRIVATE
+    -Wall
+    -Wextra
+    -Werror
+    -O2
+)
+target_link_libraries(vhbu_bgdl PUBLIC
+    taihen_stub
+    SceKernelModulemgr_stub
 )
 
-add_executable(vita_homebrew_update service-plugin/main.c)
+add_library(vhbu_paf_stubs STATIC service-plugin/paf_stubs.S)
+
+file(GLOB_RECURSE VHBU_BEARSSL_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/BearSSL-0.6/src/*.c")
+add_library(vhbu_bearssl STATIC ${VHBU_BEARSSL_SOURCES})
+target_include_directories(vhbu_bearssl
+    PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/third_party/BearSSL-0.6/inc"
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/BearSSL-0.6/src"
+)
+target_compile_definitions(vhbu_bearssl PRIVATE
+    BR_USE_URANDOM=0
+    BR_USE_WIN32_RAND=0
+    BR_USE_UNIX_TIME=0
+    BR_USE_WIN32_TIME=0
+    BR_AES_X86NI=0
+    BR_SSE2=0
+    BR_POWER8=0
+    BR_INT128=0
+)
+target_compile_options(vhbu_bearssl PRIVATE -O2)
+
+add_executable(vita_homebrew_update
+    service-plugin/main.c
+    common/bearssl_support.c
+    common/libc_compat.c
+    common/file_verify.c
+    common/sha1.c
+    common/fs_tree.c
+    common/notification_db.c
+    common/update_config.c
+    common/vpk_extract.c
+)
+target_include_directories(vita_homebrew_update PRIVATE common)
 target_compile_options(vita_homebrew_update PRIVATE
+    -Wall
+    -Wextra
+    -Werror
+    -O2
     -ffreestanding
     -fno-stack-protector
 )
+if(VHBU_ENABLE_CUSTOM_DIALOG)
+    target_compile_definitions(vita_homebrew_update PRIVATE
+        VHBU_ENABLE_CUSTOM_DIALOG=1)
+endif()
 target_link_options(vita_homebrew_update PRIVATE -Wl,-q -nostdlib)
 target_link_libraries(vita_homebrew_update
+    vhbu_bgdl
+    vhbu_paf_stubs
+    vhbu_bearssl
     taihen_stub_weak
+    SceAppMgr_stub_weak
     SceIofilemgr_stub_weak
+    SceKernelModulemgr_stub_weak
     SceKernelThreadMgr_stub_weak
     SceLibKernel_stub_weak
+    SceNotificationUtil_stub_weak
+    ScePromoterUtil_stub_weak
+    SceRtc_stub_weak
+    SceSqlite_stub_weak
+    SceSysmem_stub_weak
+    SceSysmodule_stub_weak
+    z
+    gcc
 )
+set(VITA_ELF_CREATE_FLAGS "")
 vita_create_self(vita-homebrew-update.suprx vita_homebrew_update UNSAFE
-    CONFIG ${CMAKE_CURRENT_SOURCE_DIR}/service-plugin/exports.yml
+    CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/service-plugin/exports.yml"
 )
+
+install(TARGETS HomebrewUpdateClient ARCHIVE DESTINATION lib)
+install(FILES client/include/homebrew_update_client.h DESTINATION include)

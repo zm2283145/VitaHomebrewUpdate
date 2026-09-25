@@ -1,8 +1,12 @@
 #include "homebrew_update_client.h"
 
 #include <psp2/net/net.h>
+#include <psp2/appmgr.h>
+#include <psp2/io/fcntl.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "pending_update.h"
 
 #define HBU_STATUS_PORT 13379
 #define HBU_CLIENT_TIMEOUT_US 250000
@@ -22,19 +26,32 @@ static int send_all(int socket, const char *data, int length)
     return 0;
 }
 
-int HomebrewUpdateClientGetStatus(void)
+static int get_status(const char *title_id)
 {
-    static const char request[] =
-        "GET /status HTTP/1.1\r\n"
-        "Host: 127.0.0.1\r\n"
-        "Connection: close\r\n\r\n";
     SceNetSockaddrIn address;
+    char request[192];
     char response[HBU_RESPONSE_CAPACITY];
     char *body;
     int socket;
     int timeout = HBU_CLIENT_TIMEOUT_US;
     int total = 0;
     int status;
+    int request_length;
+
+    if (title_id != NULL && title_id[0] != '\0') {
+        request_length = snprintf(request, sizeof(request),
+                                  "GET /status/%s HTTP/1.1\r\n"
+                                  "Host: 127.0.0.1\r\n"
+                                  "Connection: close\r\n\r\n",
+                                  title_id);
+    } else {
+        request_length = snprintf(request, sizeof(request),
+                                  "GET /status HTTP/1.1\r\n"
+                                  "Host: 127.0.0.1\r\n"
+                                  "Connection: close\r\n\r\n");
+    }
+    if (request_length <= 0 || request_length >= (int)sizeof(request))
+        return HOMEBREW_UPDATE_NOT_DETECTED;
 
     socket = sceNetSocket("vhbu_status_client", SCE_NET_AF_INET,
                           SCE_NET_SOCK_STREAM, 0);
@@ -54,7 +71,7 @@ int HomebrewUpdateClientGetStatus(void)
 
     if (sceNetConnect(socket, (SceNetSockaddr *)&address,
                       sizeof(address)) < 0 ||
-        send_all(socket, request, (int)sizeof(request) - 1) < 0) {
+        send_all(socket, request, request_length) < 0) {
         sceNetSocketClose(socket);
         return HOMEBREW_UPDATE_NOT_DETECTED;
     }
@@ -82,4 +99,45 @@ int HomebrewUpdateClientGetStatus(void)
         status > HOMEBREW_UPDATE_READY)
         return HOMEBREW_UPDATE_NOT_DETECTED;
     return status;
+}
+
+int HomebrewUpdateClientGetStatus(void)
+{
+    return get_status(NULL);
+}
+
+int HomebrewUpdateClientGetStatusForTitle(const char *title_id)
+{
+    return get_status(title_id);
+}
+
+int HomebrewUpdateClientLaunchPendingInstaller(const char *title_id)
+{
+    VhbuPendingUpdate pending;
+    char uri[64];
+    SceUID file;
+    int received;
+    int length;
+    int result;
+
+    if (title_id == NULL || strlen(title_id) != 9u)
+        return -1;
+    file = sceIoOpen(VHBU_PENDING_PATH, SCE_O_RDONLY, 0);
+    if (file < 0)
+        return 0;
+    memset(&pending, 0, sizeof(pending));
+    received = sceIoRead(file, &pending, sizeof(pending));
+    sceIoClose(file);
+    if (received != (int)sizeof(pending) ||
+        pending.magic != VHBU_PENDING_MAGIC ||
+        pending.format != VHBU_PENDING_FORMAT)
+        return -2;
+    if (strncmp(pending.title_id, title_id, sizeof(pending.title_id)) != 0)
+        return 0;
+    length = snprintf(uri, sizeof(uri),
+                      "psgm:play?titleid=%s", VHBU_HELPER_TITLE_ID);
+    if (length <= 0 || length >= (int)sizeof(uri))
+        return -3;
+    result = sceAppMgrLaunchAppByUri(0xfffff, uri);
+    return result < 0 ? result : 1;
 }

@@ -5,6 +5,8 @@
 
 enum lau_bgdl_type {
     LAU_BGDL_PSP = 0x00,
+    /* HomebrewUpdate uses the generic task class for VPK payloads. */
+    LAU_BGDL_VPK = 0x01,
     LAU_BGDL_PSM = 0x06,
     LAU_BGDL_THEME = 0x0c,
     LAU_BGDL_GAME = 0x16,
@@ -27,4 +29,3 @@ int lau_bgdl_enqueue(int type, const char *title, const char *url,
                      const char *icon_path, lau_bgdl_result *out);
 
 #endif
-

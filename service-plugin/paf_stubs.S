@@ -1,0 +1,53 @@
+.arch armv7a
+
+.macro VHBU_FSTUB symbol, section_name, library_nid, function_nid
+.section .vitalink.fstubs.\section_name,"ax",%progbits
+.align 4
+.global \symbol
+.type \symbol, %function
+\symbol:
+.word 0x00000008
+.word \library_nid
+.word \function_nid
+.align 4
+.endm
+
+.macro VHBU_VSTUB symbol, section_name, library_nid, variable_nid
+.section .vitalink.vstubs.\section_name,"",%progbits
+.align 4
+.global \symbol
+.type \symbol, %object
+\symbol:
+.word 0x00000008
+.word \library_nid
+.word \variable_nid
+.align 4
+.endm
+
+VHBU_FSTUB _ZN3paf6Plugin4FindEPKc, ScePafToplevel, 0x4D9A9DD0, 0x004D98CC
+VHBU_FSTUB _ZN3paf6Plugin9InitParamC1Ev, ScePafToplevel, 0x4D9A9DD0, 0x400F84CE
+VHBU_FSTUB _ZN3paf6Plugin8LoadSyncERKNS0_9InitParamEPFvPS0_Ei, ScePafToplevel, 0x4D9A9DD0, 0xBE479650
+VHBU_FSTUB _ZN3paf6Plugin11UnloadAsyncEPS0_PFvPKcEi, ScePafToplevel, 0x4D9A9DD0, 0x1ADB3A22
+VHBU_FSTUB _ZN3paf6Plugin13PageOpenParamC1Ev, ScePafToplevel, 0x4D9A9DD0, 0x34FE1331
+VHBU_FSTUB _ZN3paf6Plugin14PageCloseParamC1Ev, ScePafToplevel, 0x4D9A9DD0, 0x185EC9F9
+VHBU_FSTUB _ZN3paf6Plugin17TemplateOpenParamC1Ev, ScePafToplevel, 0x4D9A9DD0, 0x99300D8B
+VHBU_FSTUB _ZN3paf6Plugin8PageOpenERKNS_7IDParamERKNS0_13PageOpenParamE, ScePafToplevel, 0x4D9A9DD0, 0x30B442D9
+VHBU_FSTUB _ZN3paf6Plugin9PageCloseERKNS_7IDParamERKNS0_14PageCloseParamE, ScePafToplevel, 0x4D9A9DD0, 0x3FE812F6
+VHBU_FSTUB _ZN3paf6Plugin10GetTextureERKNS_7IDParamE, ScePafToplevel, 0x4D9A9DD0, 0x38FFFE8E
+VHBU_FSTUB _ZN3paf6Plugin12TemplateOpenEPNS_2ui6WidgetERKNS_7IDParamERKNS0_17TemplateOpenParamE, ScePafToplevel, 0x4D9A9DD0, 0xAB0DB9B0
+VHBU_FSTUB _ZN3paf7IDParam9ID2IDHashERKNS_12basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEEE, ScePafResource, 0x2836DC9B, 0x5F05DE68
+VHBU_FSTUB _ZN3paf2ui6Widget9FindChildERKNS_7IDParamEi, ScePafWidget, 0x073F8C68, 0x9D304F4A
+VHBU_FSTUB _ZN3paf2ui6Widget4ShowENS_6common10transition4TypeEfPFviPNS0_7HandlerEPNS0_5EventEPvES9_, ScePafWidget, 0x073F8C68, 0x44B22ACA
+VHBU_FSTUB _ZN3paf2ui6Widget4HideENS_6common10transition4TypeEfPFviPNS0_7HandlerEPNS0_5EventEPvES9_, ScePafWidget, 0x073F8C68, 0xF1176ACC
+VHBU_FSTUB _ZN3paf5graph7Surface7ReleaseEv, ScePafGraphics, 0xA070D6A7, 0x9FAF51CF
+VHBU_FSTUB _ZN3paf5graph7Surface4LoadEPNS0_11SurfacePoolENS_6common9SharedPtrINS_4FileEEEPNS1_10LoadOptionE, ScePafGraphics, 0xA070D6A7, 0xB228A257
+VHBU_FSTUB _ZN3paf5gutil21GetDefaultSurfacePoolEv, ScePafGraphics, 0xA070D6A7, 0xCDE30B64
+VHBU_FSTUB _ZN3paf9LocalFile4OpenEPKcjjPi, ScePafMisc, 0x3D643CE8, 0xB9FB9BD6
+VHBU_FSTUB sce_paf_free, ScePafStdc, 0xA7D28DAE, 0x347AFDD9
+VHBU_FSTUB _ZN3paf6common18MainThreadCallList8RegisterEPFvPvES2_, ScePafCommon, 0x3C1965CD, 0x6735B503
+VHBU_FSTUB _ZN3paf6common18MainThreadCallList10UnregisterEPFvPvES2_, ScePafCommon, 0x3C1965CD, 0x4A8115D5
+VHBU_FSTUB _ZN3sce15CommonGuiDialog6Dialog4ShowEPN3paf6PluginEPNS2_12basic_stringIwNS2_11char_traitsIwEENS2_9allocatorIwEEEESB_PNS0_5ParamEPFviNS0_9DIALOG_CBEPvESF_, SceCommonGuiDialog, 0x4B4AAE97, 0x6CE14F66
+VHBU_FSTUB _ZN3sce15CommonGuiDialog6Dialog5CloseEi, SceCommonGuiDialog, 0x4B4AAE97, 0xBC311DC0
+VHBU_FSTUB _ZN3sce15CommonGuiDialog6Dialog9GetWidgetEiNS0_11REGISTER_IDE, SceCommonGuiDialog, 0x4B4AAE97, 0x8947FC23
+VHBU_VSTUB _ZN3sce15CommonGuiDialog5Param13s_dialogYesNoE, SceCommonGuiDialog, 0x4B4AAE97, 0x6CD802FC
+VHBU_VSTUB _ZN3sce15CommonGuiDialog5Param21s_dialogTextSmallBusyE, SceCommonGuiDialog, 0x4B4AAE97, 0x2A68B4A4
